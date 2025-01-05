@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Video to ASCII Art</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      background: #1e1e1e;
+      color: #fff;
+      font-family: 'Courier New', Courier, monospace;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    h1 {
+      font-size: 2rem;
+      margin-bottom: 20px;
+    }
+
+    #file-input {
+      margin-bottom: 20px;
+      padding: 10px;
+      background: #333;
+      color: #fff;
+      border: 2px solid #555;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+
+    #file-input:hover {
+      background: #444;
+    }
+
+    #ascii-art {
+      white-space: pre;
+      letter-spacing: 2px;
+      font-size: 8px;
+      line-height: 8px;
+      background: #000;
+      padding: 10px;
+      border-radius: 5px;
+      box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+      max-width: 90vw;
+      max-height: 80vh;
+      overflow: hidden; /* Remove scrollbars */
+    }
+
+    #video {
+      display: none;
+    }
+
+    .container {
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Video to ASCII Art Converter</h1>
+    <input type="file" id="file-input" accept="video/*">
+    <div id="ascii-art"></div>
+    <video id="video" controls></video>
+  </div>
+
+  <script>
+    const fileInput = document.getElementById('file-input');
+    const video = document.getElementById('video');
+    const asciiArt = document.getElementById('ascii-art');
+    const asciiChars = " ░▒▓█";
+
+    // Handle file input
+    fileInput.addEventListener('change', (event) => {
+      const file = event.target.files[0];
+      if (file) {
+        const fileURL = URL.createObjectURL(file);
+        video.src = fileURL;
+        video.addEventListener('loadedmetadata', () => {
+          video.play();
+          processVideo();
+        });
+      }
+    });
+
+    function processVideo() {
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+
+      // Function to calculate the resize factor
+      function calculateResizeFactor(videoWidth, videoHeight, maxWidth, maxHeight) {
+        const aspectRatio = videoWidth / videoHeight;
+        let newWidth = maxWidth;
+        let newHeight = maxWidth / aspectRatio;
+
+        if (newHeight > maxHeight) {
+          newHeight = maxHeight;
+          newWidth = maxHeight * aspectRatio;
+        }
+
+        return {
+          width: Math.floor(newWidth),
+          height: Math.floor(newHeight),
+        };
+      }
+
+      function renderFrame() {
+        if (video.paused || video.ended) return;
+
+        // Get the available space for the ASCII art
+        const maxWidth = asciiArt.clientWidth;
+        const maxHeight = asciiArt.clientHeight;
+
+        // Calculate the resize factor based on the video dimensions and available space
+        const { width, height } = calculateResizeFactor(video.videoWidth, video.videoHeight, maxWidth, maxHeight);
+
+        // Set canvas size to match the resized dimensions
+        canvas.width = width;
+        canvas.height = height;
+
+        // Draw the current video frame onto the canvas
+        ctx.drawImage(video, 0, 0, width, height);
+
+        // Get the image data from the canvas
+        const imageData = ctx.getImageData(0, 0, width, height);
+        const data = imageData.data;
+
+        // Convert the image data to ASCII art
+        let asciiFrame = '';
+        for (let y = 0; y < height; y += 8) {
+          for (let x = 0; x < width; x += 4) {
+            // Ensure we don't go out of bounds
+            if (y < height && x < width) {
+              const pixelIndex = (y * width + x) * 4;
+              const r = data[pixelIndex];
+              const g = data[pixelIndex + 1];
+              const b = data[pixelIndex + 2];
+
+              // Calculate grayscale value
+              const gray = (r + g + b) / 3;
+
+              // Map grayscale value to ASCII character
+              const charIndex = Math.floor((gray / 255) * (asciiChars.length - 1));
+              const char = asciiChars[charIndex];
+
+              // Add the character to the ASCII frame
+              asciiFrame += `<span style="color: rgb(${r},${g},${b})">${char}</span>`;
+            }
+          }
+          asciiFrame += '\n';
+        }
+
+        // Display the ASCII frame
+        asciiArt.innerHTML = asciiFrame;
+
+        // Request the next frame
+        requestAnimationFrame(renderFrame);
+      }
+
+      // Start rendering frames
+      renderFrame();
+    }
+  </script>
+</body>
+</html>
